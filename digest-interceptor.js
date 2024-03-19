@@ -8,10 +8,16 @@ const defaultRetry = RetryHandler[kRetryHandlerDefaultRetry]
 
 function createDigestInterceptor (options) {
   const {
-    retryOnStatusCodes = [401],
     urls = [],
     username,
-    password
+    password,
+    retryOptions = {
+      statusCodes: [401],
+      maxRetries: 1,
+      retryAfter: 0,
+      minTimeout: 0,
+      timeoutFactor: 1
+    }
   } = options
 
   return dispatch => function DigestIntercept (opts, handler) {
@@ -26,6 +32,7 @@ function createDigestInterceptor (options) {
     const retryHandler = new RetryHandler({
       ...opts,
       retryOptions: {
+        ...retryOptions,
         retry (err, context, callback) {
           const { headers: { 'www-authenticate': authenticate } = {} } = err
           if (authenticate) {
@@ -56,12 +63,7 @@ function createDigestInterceptor (options) {
             }
           }
           defaultRetry.call(retryHandler, err, context, callback)
-        },
-        statusCodes: retryOnStatusCodes,
-        maxRetries: 1,
-        retryAfter: 0,
-        minTimeout: 0,
-        timeoutFactor: 1
+        }
       }
     }, {
       dispatch ({ headers, ...opts }, handler) {
