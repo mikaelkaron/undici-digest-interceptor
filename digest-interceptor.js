@@ -1,8 +1,8 @@
 'use strict'
 
+const { analyze } = require('./lib/utils')
 const { RetryHandler } = require('undici')
 const { kRetryHandlerDefaultRetry } = require('undici/lib/core/symbols')
-const { ClientDigestAuth, QOP_AUTH, QOP_AUTH_INT } = require('@mreal/digest-auth')
 
 const defaultRetry = RetryHandler[kRetryHandlerDefaultRetry]
 
@@ -19,60 +19,53 @@ function createDigestInterceptor (options) {
       timeoutFactor: 1
     }
   } = options
+  
+  return dispatch =>  {
+    let generate
 
-  return dispatch => function DigestIntercept (opts, handler) {
-    if (!urls.includes(opts.origin)) {
-      // do not attempt intercept
-      return dispatch(opts, handler)
+    function authorized({ headers, ...opts }, handler) {
+      const { method, origin, path, body: entryBody } = opts
+      const uri = `${origin}${path}`
+      const { raw: authorize } = generate(username, password, {
+        method,
+        uri,
+        entryBody
+      })
+      return dispatch({ ...opts, headers: { ...headers, authorize } }, handler)
     }
 
-    const counter = 1
-    let authorize
-
-    const retryHandler = new RetryHandler({
-      ...opts,
-      retryOptions: {
-        ...retryOptions,
-        retry (err, context, callback) {
-          const { headers: { 'www-authenticate': authenticate } = {} } = err
-          if (authenticate) {
-            const { opts: { method, origin, path, body: entryBody } } = context
-            const uri = `${origin}${path}`
-            const serverDigest = ClientDigestAuth.analyze(authenticate)
-            switch (serverDigest.qop) {
-              case QOP_AUTH_INT:
-                authorize = ClientDigestAuth.generateProtectionAuthInt(serverDigest, username, password, {
-                  method,
-                  uri,
-                  counter,
-                  entryBody
-                }).raw
-                break
-              case QOP_AUTH:
-                authorize = ClientDigestAuth.generateProtectionAuth(serverDigest, username, password, {
-                  method,
-                  uri,
-                  counter
-                }).raw
-                break
-              default:
-                authorize = ClientDigestAuth.generateUnprotected(serverDigest, username, password, {
-                  method,
-                  uri
-                }).raw
-            }
-          }
-          defaultRetry.call(retryHandler, err, context, callback)
-        }
+    return function DigestIntercept (opts, handler) {
+      const { origin } = opts
+      if (!urls.includes(origin)) {
+        // do not attempt intercept
+        return dispatch(opts, handler)
       }
-    }, {
-      dispatch ({ headers, ...opts }, handler) {
-        return dispatch({ ...opts, headers: { ...headers, authorize } }, handler)
-      },
-      handler
-    })
 
-    return dispatch(opts, retryHandler)
+      if (generate) {
+        return authorized(opts, handler)
+      }
+
+      const retryHandler = new RetryHandler({
+        ...opts,
+        retryOptions: {
+          ...retryOptions,
+          retry (err, context, callback) {
+            const { headers: { 'www-authenticate': wwwAuthenticate } = {} } = err
+            if (wwwAuthenticate) {
+              generate = analyze(wwwAuthenticate)
+            }
+            defaultRetry.call(retryHandler, err, context, callback)
+          }
+        }
+      }, {
+        dispatch (opts, handler) {
+          return authorized(opts, handler)
+        },
+        handler
+      })
+
+      return dispatch(opts, retryHandler)
+    }
   }
 }
 
