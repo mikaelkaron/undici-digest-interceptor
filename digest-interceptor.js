@@ -23,8 +23,8 @@ function createDigestInterceptor (options) {
   return dispatch =>  {
     let generate
 
-    function authorized({ headers, ...opts }, handler) {
-      const { method, origin, path, body: entryBody } = opts
+    function authorized(opts, handler) {
+      const { headers, method, origin, path, body: entryBody } = opts
       const uri = `${origin}${path}`
       const { raw: authorize } = generate(username, password, {
         method,
@@ -35,8 +35,7 @@ function createDigestInterceptor (options) {
     }
 
     return function DigestIntercept (opts, handler) {
-      const { origin } = opts
-      if (!urls.includes(origin)) {
+      if (!urls.includes(opts.origin)) {
         // do not attempt intercept
         return dispatch(opts, handler)
       }
@@ -58,8 +57,11 @@ function createDigestInterceptor (options) {
           }
         }
       }, {
-        dispatch (opts, handler) {
-          return authorized(opts, handler)
+        dispatch(opts, handler) {
+          if (generate) {
+            return authorized(opts, handler)
+          }
+          return dispatch(opts, handler)
         },
         handler
       })
