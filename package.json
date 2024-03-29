@@ -5,7 +5,8 @@
   "main": "digest-interceptor.js",
   "scripts": {
     "lint": "standard",
-    "test": "borp --coverage"
+    "test": "borp --coverage",
+    "release": "semantic-release"
   },
   "author": "Mikael Karon <mikael@karon.se>",
   "license": "MIT",
@@ -14,7 +15,14 @@
     "undici": "^6.10.2"
   },
   "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^12.0.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^10.0.2",
+    "@semantic-release/npm": "^12.0.0",
+    "@semantic-release/release-notes-generator": "^13.0.0",
     "borp": "^0.10.0",
-    "standard": "^17.1.0"
+    "standard": "^17.1.0",
+    "semantic-release": "^23.0.6"
   }
 }
