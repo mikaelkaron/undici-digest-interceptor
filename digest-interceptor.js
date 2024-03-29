@@ -53,7 +53,21 @@ function createDigestInterceptor (options) {
             if (wwwAuthenticate) {
               generate = analyze(wwwAuthenticate)
             }
-            defaultRetry.call(retryHandler, err, context, callback)
+            if (context.state.counter > retryOptions.maxRetries) {
+              const { context, opaque, callback, trailers, body  } = retryHandler.handler;
+              const { statusCode, headers } = err
+              retryHandler.handler.runInAsyncScope(callback, null, null, {
+                statusCode,
+                headers,
+                trailers,
+                opaque,
+                body,
+                context
+              })
+            }
+            else {
+              defaultRetry.call(retryHandler, err, context, callback)
+            }
           }
         }
       }, {
